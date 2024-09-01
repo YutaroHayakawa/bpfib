@@ -271,6 +271,9 @@ var lookupCmd = &cobra.Command{
 		if output, _ := cmd.Flags().GetBool("output"); output {
 			flags |= BFP_FIB_LOOKUP_OUTPUT
 		}
+		if skipNeigh, _ := cmd.Flags().GetBool("skip-neigh"); skipNeigh {
+			flags |= BPF_FIB_LOOKUP_SKIP_NEIGH
+		}
 		if in.TableID != nil {
 			if flags&BFP_FIB_LOOKUP_DIRECT == 0 {
 				cmd.PrintErrf("Forcefully setting BFP_FIB_LOOKUP_DIRECT option since you specified table option which requires direct lookup. To suppress this message, set --direct flag explicitly.\n")
@@ -582,4 +585,5 @@ func init() {
 	lookupCmd.SetUsageFunc(lookupUsage)
 	lookupCmd.Flags().Bool("direct", false, "Set direct option (BPF_FIB_LOOKUP_DIRECT)")
 	lookupCmd.Flags().Bool("output", false, "Set output option (BPF_FIB_LOOKUP_OUTPUT)")
+	lookupCmd.Flags().Bool("skip-neigh", false, "Set skip-neigh option (BPF_FIB_LOOKUP_SKIP_NEIGH)")
 }
