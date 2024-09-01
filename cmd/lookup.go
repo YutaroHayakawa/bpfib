@@ -45,6 +45,7 @@ type lookupIn struct {
 	SrcAddr      netip.Addr
 	DstAddr      netip.Addr
 	TableID      *uint32
+	Mark         *uint32
 }
 
 func (in *lookupIn) marshal() []byte {
@@ -100,8 +101,14 @@ func (in *lookupIn) marshal() []byte {
 	} else {
 		binary.Write(buf, binary.NativeEndian, uint32(0))
 	}
+	// param->mark
+	if in.Mark != nil {
+		binary.Write(buf, binary.NativeEndian, in.Mark)
+	} else {
+		binary.Write(buf, binary.NativeEndian, uint32(0))
+	}
 	// Padding
-	buf.Write(bytes.Repeat([]byte{0}, 12))
+	buf.Write(bytes.Repeat([]byte{0}, 8))
 	return buf.Bytes()
 }
 
@@ -551,6 +558,22 @@ var lookupCmdOpts = map[string]lookupOpt{
 			return 1, nil
 		},
 		probe: func() bool { return true },
+	},
+	"mark": {
+		desc: []string{"mark", "<mark>", "Mark"},
+		handle: func(in *lookupIn, args []string) (int, error) {
+			if len(args) == 0 {
+				return 0, fmt.Errorf("mark is unspecified")
+			}
+			mark, err := strconv.ParseUint(args[0], 0, 32)
+			if err != nil {
+				return 0, fmt.Errorf("cannot parse mark: %w", err)
+			}
+			mark32 := uint32(mark)
+			in.Mark = &mark32
+			return 1, nil
+		},
+		probe: func() bool { return false },
 	},
 }
 
