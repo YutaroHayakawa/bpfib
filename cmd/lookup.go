@@ -44,6 +44,7 @@ type lookupIn struct {
 	IPv6FlowInfo *uint32
 	SrcAddr      netip.Addr
 	DstAddr      netip.Addr
+	TableID      *uint32
 }
 
 func (in *lookupIn) marshal() []byte {
@@ -93,8 +94,14 @@ func (in *lookupIn) marshal() []byte {
 		a := in.DstAddr.As16()
 		buf.Write(a[:])
 	}
+	// param->tbid
+	if in.TableID != nil {
+		binary.Write(buf, binary.NativeEndian, in.TableID)
+	} else {
+		binary.Write(buf, binary.NativeEndian, uint32(0))
+	}
 	// Padding
-	buf.Write(bytes.Repeat([]byte{0}, 16))
+	buf.Write(bytes.Repeat([]byte{0}, 12))
 	return buf.Bytes()
 }
 
@@ -263,6 +270,13 @@ var lookupCmd = &cobra.Command{
 		}
 		if output, _ := cmd.Flags().GetBool("output"); output {
 			flags |= BFP_FIB_LOOKUP_OUTPUT
+		}
+		if in.TableID != nil {
+			if flags&BFP_FIB_LOOKUP_DIRECT == 0 {
+				cmd.PrintErrf("Forcefully setting BFP_FIB_LOOKUP_DIRECT option since you specified table option which requires direct lookup. To suppress this message, set --direct flag explicitly.\n")
+				flags |= BFP_FIB_LOOKUP_DIRECT
+			}
+			flags |= BFP_FIB_LOOKUP_TBID
 		}
 
 		// Serialize input parameters to write struct bpf_fib_lookup to map
@@ -487,6 +501,22 @@ var lookupCmdOpts = map[string]lookupOpt{
 				return 0, fmt.Errorf("cannot parse src: %w", err)
 			}
 			in.SrcAddr = addr
+			return 1, nil
+		},
+		probe: func() bool { return true },
+	},
+	"table": {
+		desc: []string{"table", "<table id>", "Table ID"},
+		handle: func(in *lookupIn, args []string) (int, error) {
+			if len(args) == 0 {
+				return 0, fmt.Errorf("table is unspecified")
+			}
+			tableID, err := strconv.ParseUint(args[0], 10, 32)
+			if err != nil {
+				return 0, fmt.Errorf("cannot parse table id: %w", err)
+			}
+			tableID32 := uint32(tableID)
+			in.TableID = &tableID32
 			return 1, nil
 		},
 		probe: func() bool { return true },
