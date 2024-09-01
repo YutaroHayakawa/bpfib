@@ -4,7 +4,7 @@ go 1.21.0
 
 require (
 	github.com/cilium/ebpf v0.16.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 )
 
 require (
