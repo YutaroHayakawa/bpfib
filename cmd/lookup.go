@@ -110,6 +110,7 @@ type lookupOut struct {
 	MTU       uint16
 	Iface     string
 	Metric    uint32
+	Source    netip.Addr
 	NextHop   netip.Addr
 	VlanProto uint16
 	VlanTCI   uint16
@@ -142,7 +143,10 @@ func (out *lookupOut) String(queryAddr netip.Addr) string {
 		s += fmt.Sprintf("dmac %s ", net.HardwareAddr(out.DMAC[:]).String())
 	}
 	if out.Metric != 0 {
-		s += fmt.Sprintf("metric %d", out.Metric)
+		s += fmt.Sprintf("metric %d ", out.Metric)
+	}
+	if !out.Source.IsUnspecified() {
+		s += fmt.Sprintf("src %s ", out.Source)
 	}
 	return s
 }
@@ -184,7 +188,23 @@ func (out *lookupOut) unmarshal(data []byte) {
 	// param->rt_metric
 	binary.Read(buf, binary.NativeEndian, &out.Metric)
 
-	// skip ipv6_src
+	// param->ipv4_src or ipv6_src
+	switch out.Family {
+	case "inet":
+		var (
+			addr [4]byte
+			pad  [12]byte
+		)
+		binary.Read(buf, binary.BigEndian, &addr)
+		out.Source = netip.AddrFrom4(addr)
+		binary.Read(buf, binary.BigEndian, &pad)
+	case "inet6":
+		var addr [16]byte
+		binary.Read(buf, binary.BigEndian, &addr)
+		out.Source = netip.AddrFrom16(addr)
+	default:
+		out.Source = netip.Addr{}
+	}
 	binary.Read(buf, binary.NativeEndian, &[16]byte{})
 
 	// param->ipv4_dst or param->ipv6_dst
@@ -280,6 +300,9 @@ var lookupCmd = &cobra.Command{
 				flags |= BFP_FIB_LOOKUP_DIRECT
 			}
 			flags |= BFP_FIB_LOOKUP_TBID
+		}
+		if src, _ := cmd.Flags().GetBool("src"); src {
+			flags |= BFP_FIB_LOOKUP_SRC
 		}
 
 		// Serialize input parameters to write struct bpf_fib_lookup to map
@@ -389,6 +412,11 @@ var lookupCmd = &cobra.Command{
 			// then the MTU was exceeded and output
 			// params->mtu_result contains the MTU.
 			cmd.Printf("Fragmentation Needed (BPF_FIB_LKUP_RET_FRAG_NEEDED) mtu %d\n", out.MTU)
+		case BPF_FIB_LKUP_RET_NO_SRC_ADDR:
+			// No source address found, but the FIB lookup was successful.
+			// The output should contain the partial result.
+			cmd.Println("No Source Address (BPF_FIB_LKUP_RET_NO_SRC_ADDR)")
+			cmd.Println(out.String(dst))
 		case math.MinInt32:
 			cmd.Println("BUG: bpf_fib_lookup failed")
 		default:
@@ -586,4 +614,5 @@ func init() {
 	lookupCmd.Flags().Bool("direct", false, "Set direct option (BPF_FIB_LOOKUP_DIRECT)")
 	lookupCmd.Flags().Bool("output", false, "Set output option (BPF_FIB_LOOKUP_OUTPUT)")
 	lookupCmd.Flags().Bool("skip-neigh", false, "Set skip-neigh option (BPF_FIB_LOOKUP_SKIP_NEIGH)")
+	lookupCmd.Flags().Bool("src", false, "Set src option (BPF_FIB_LOOKUP_SRC)")
 }
