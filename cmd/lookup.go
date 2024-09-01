@@ -128,7 +128,7 @@ type lookupOut struct {
 func (out *lookupOut) String(queryAddr netip.Addr) string {
 	var s string
 	s += fmt.Sprintf("%s ", queryAddr.String())
-	if out.NextHop != queryAddr {
+	if out.NextHop != queryAddr && !out.NextHop.IsUnspecified() {
 		s += fmt.Sprintf("via %s ", out.NextHop)
 	}
 	if out.Iface != "" {
