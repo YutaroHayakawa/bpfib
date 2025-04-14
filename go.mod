@@ -1,11 +1,11 @@
 module github.com/YutaroHayakawa/bpfib
 
-go 1.22
+go 1.23.0
 
 toolchain go1.23.5
 
 require (
-	github.com/cilium/ebpf v0.17.3
+	github.com/cilium/ebpf v0.18.0
 	github.com/spf13/cobra v1.9.1
 )
 
