@@ -2,7 +2,7 @@ module github.com/YutaroHayakawa/bpfib
 
 go 1.23.0
 
-toolchain go1.23.5
+toolchain go1.24.2
 
 require (
 	github.com/cilium/ebpf v0.18.0
