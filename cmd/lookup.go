@@ -46,6 +46,7 @@ type lookupIn struct {
 	DstAddr      netip.Addr
 	TableID      *uint32
 	Mark         *uint32
+	SkbLen       uint32
 }
 
 func (in *lookupIn) marshal() []byte {
@@ -371,9 +372,13 @@ var lookupCmd = &cobra.Command{
 			return
 		}
 
+		skbLen := 64
+		if in.SkbLen != 0 {
+			skbLen = int(in.SkbLen)
+		}
 		// We don't need to attach the program to any interface. Just
 		// run it should be sufficient to test the bpf_fib_lookup.
-		uret, _, err := col.Programs["lookup"].Test(bytes.Repeat([]byte{0xff}, 64))
+		uret, _, err := col.Programs["lookup"].Test(bytes.Repeat([]byte{0xff}, skbLen))
 		if err != nil {
 			cmd.PrintErrf("Failed to run program: %s\n\n", err)
 			return
@@ -574,6 +579,20 @@ var lookupCmdOpts = map[string]lookupOpt{
 			return 1, nil
 		},
 		probe: func() bool { return false },
+	},
+	"skblen": {
+		desc: []string{"skblen", "<skblen>", "skb->len"},
+		handle: func(in *lookupIn, args []string) (int, error) {
+			if len(args) == 0 {
+				return 0, fmt.Errorf("len is unspecified")
+			}
+			skblen, err := strconv.ParseUint(args[0], 10, 32)
+			if err != nil {
+				return 0, fmt.Errorf("cannot parse skblen: %w", err)
+			}
+			in.SkbLen = uint32(skblen)
+			return 1, nil
+		},
 	},
 }
 
