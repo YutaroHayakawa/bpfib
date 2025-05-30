@@ -46,6 +46,8 @@ type lookupIn struct {
 	DstAddr      netip.Addr
 	TableID      *uint32
 	Mark         *uint32
+	SkbLen       uint32
+	GsoSize      uint32
 }
 
 func (in *lookupIn) marshal() []byte {
@@ -373,7 +375,27 @@ var lookupCmd = &cobra.Command{
 
 		// We don't need to attach the program to any interface. Just
 		// run it should be sufficient to test the bpf_fib_lookup.
-		uret, _, err := col.Programs["lookup"].Test(bytes.Repeat([]byte{0xff}, 64))
+		skbLen := 64
+		if in.SkbLen != 0 {
+			skbLen = int(in.SkbLen)
+		}
+		context := make([]byte, 256)
+		if in.GsoSize != 0 {
+			offset, size, err := MemberOfSkBuff("gso_size")
+			if err != nil {
+				cmd.PrintErrf("Failed to get offset of gso_size: %s\n\n", err)
+				return
+			}
+			binary.NativeEndian.PutUint32(context[offset:offset+size], in.GsoSize)
+		}
+		runOptions := &ebpf.RunOptions{
+			Data: bytes.Repeat([]byte{0xff}, skbLen),
+			// https://github.com/cilium/ebpf/blob/20c4d8896bdde990ce6b80d59a4262aa3ccb891d/prog.go#L563-L567
+			DataOut:    make([]byte, skbLen+256+2),
+			Context:    context,
+			ContextOut: make([]byte, 256),
+		}
+		uret, err := col.Programs["lookup"].Run(runOptions)
 		if err != nil {
 			cmd.PrintErrf("Failed to run program: %s\n\n", err)
 			return
@@ -574,6 +596,34 @@ var lookupCmdOpts = map[string]lookupOpt{
 			return 1, nil
 		},
 		probe: func() bool { return false },
+	},
+	"skblen": {
+		desc: []string{"skblen", "<skblen>", "skb->len"},
+		handle: func(in *lookupIn, args []string) (int, error) {
+			if len(args) == 0 {
+				return 0, fmt.Errorf("len is unspecified")
+			}
+			skblen, err := strconv.ParseUint(args[0], 10, 32)
+			if err != nil {
+				return 0, fmt.Errorf("cannot parse skblen: %w", err)
+			}
+			in.SkbLen = uint32(skblen)
+			return 1, nil
+		},
+	},
+	"gso_size": {
+		desc: []string{"gso_size", "<gso_size>", "skb_shinfo(skb)->gso_size"},
+		handle: func(in *lookupIn, args []string) (int, error) {
+			if len(args) == 0 {
+				return 0, fmt.Errorf("gso_size is unspecified")
+			}
+			gsoSize, err := strconv.ParseUint(args[0], 10, 32)
+			if err != nil {
+				return 0, fmt.Errorf("cannot parse gso_size: %w", err)
+			}
+			in.GsoSize = uint32(gsoSize)
+			return 1, nil
+		},
 	},
 }
 
