@@ -311,6 +311,12 @@ var lookupCmd = &cobra.Command{
 		if src, _ := cmd.Flags().GetBool("src"); src {
 			flags |= BFP_FIB_LOOKUP_SRC
 		}
+		if in.Mark != nil {
+			if flags&BPF_FIB_LOOKUP_DIRECT != 0 {
+				cmd.PrintErrf("Forcefully resetting BFP_FIB_LOOKUP_DIRECT option since you specified mark option which should not be used with direct lookup. To suppress this message, don't set --direct flag.\n")
+				flags &^= BFP_FIB_LOOKUP_DIRECT
+			}
+		}
 
 		// Serialize input parameters to write struct bpf_fib_lookup to map
 		param := in.marshal()
