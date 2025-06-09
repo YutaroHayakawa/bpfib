@@ -295,28 +295,28 @@ var lookupCmd = &cobra.Command{
 		// Additional flags for bpf_fib_lookup
 		flags := uint32(0)
 		if direct, _ := cmd.Flags().GetBool("direct"); direct {
-			flags |= BFP_FIB_LOOKUP_DIRECT
+			flags |= BPF_FIB_LOOKUP_DIRECT
 		}
 		if output, _ := cmd.Flags().GetBool("output"); output {
-			flags |= BFP_FIB_LOOKUP_OUTPUT
+			flags |= BPF_FIB_LOOKUP_OUTPUT
 		}
 		if skipNeigh, _ := cmd.Flags().GetBool("skip-neigh"); skipNeigh {
 			flags |= BPF_FIB_LOOKUP_SKIP_NEIGH
 		}
 		if in.TableID != nil {
-			if flags&BFP_FIB_LOOKUP_DIRECT == 0 {
+			if flags&BPF_FIB_LOOKUP_DIRECT == 0 {
 				cmd.PrintErrf("Forcefully setting BFP_FIB_LOOKUP_DIRECT option since you specified table option which requires direct lookup. To suppress this message, set --direct flag explicitly.\n")
-				flags |= BFP_FIB_LOOKUP_DIRECT
+				flags |= BPF_FIB_LOOKUP_DIRECT
 			}
-			flags |= BFP_FIB_LOOKUP_TBID
+			flags |= BPF_FIB_LOOKUP_TBID
 		}
 		if src, _ := cmd.Flags().GetBool("src"); src {
-			flags |= BFP_FIB_LOOKUP_SRC
+			flags |= BPF_FIB_LOOKUP_SRC
 		}
 		if in.Mark != nil {
 			if flags&BPF_FIB_LOOKUP_DIRECT != 0 {
-				cmd.PrintErrf("Forcefully resetting BFP_FIB_LOOKUP_DIRECT option since you specified mark option which should not be used with direct lookup. To suppress this message, don't set --direct flag.\n")
-				flags &^= BFP_FIB_LOOKUP_DIRECT
+				cmd.PrintErrf("Forcefully resetting BPF_FIB_LOOKUP_DIRECT option since you specified mark option which should not be used with direct lookup. To suppress this message, don't set --direct flag.\n")
+				flags &^= BPF_FIB_LOOKUP_DIRECT
 			}
 		}
 

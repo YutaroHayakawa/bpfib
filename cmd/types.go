@@ -1,12 +1,12 @@
 package cmd
 
 const (
-	BFP_FIB_LOOKUP_DIRECT     = uint32(1) << 0
-	BFP_FIB_LOOKUP_OUTPUT     = uint32(1) << 1
+	BPF_FIB_LOOKUP_DIRECT     = uint32(1) << 0
+	BPF_FIB_LOOKUP_OUTPUT     = uint32(1) << 1
 	BPF_FIB_LOOKUP_SKIP_NEIGH = uint32(1) << 2
-	BFP_FIB_LOOKUP_TBID       = uint32(1) << 3
-	BFP_FIB_LOOKUP_SRC        = uint32(1) << 4
-	BFP_FIB_LOOKUP_MARK       = uint32(1) << 5
+	BPF_FIB_LOOKUP_TBID       = uint32(1) << 3
+	BPF_FIB_LOOKUP_SRC        = uint32(1) << 4
+	BPF_FIB_LOOKUP_MARK       = uint32(1) << 5
 )
 
 const (
