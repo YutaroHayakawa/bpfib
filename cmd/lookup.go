@@ -318,6 +318,7 @@ var lookupCmd = &cobra.Command{
 				cmd.PrintErrf("Forcefully resetting BPF_FIB_LOOKUP_DIRECT option since you specified mark option which should not be used with direct lookup. To suppress this message, don't set --direct flag.\n")
 				flags &^= BPF_FIB_LOOKUP_DIRECT
 			}
+			flags |= BPF_FIB_LOOKUP_MARK
 		}
 
 		// Serialize input parameters to write struct bpf_fib_lookup to map
