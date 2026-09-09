@@ -245,6 +245,37 @@ func (out *lookupOut) unmarshal(data []byte) {
 	binary.Read(buf, binary.NativeEndian, &out.DMAC)
 }
 
+func buildLookupFlags(cmd *cobra.Command, in *lookupIn) uint32 {
+	flags := uint32(0)
+	if direct, _ := cmd.Flags().GetBool("direct"); direct {
+		flags |= BPF_FIB_LOOKUP_DIRECT
+	}
+	if output, _ := cmd.Flags().GetBool("output"); output {
+		flags |= BPF_FIB_LOOKUP_OUTPUT
+	}
+	if skipNeigh, _ := cmd.Flags().GetBool("skip-neigh"); skipNeigh {
+		flags |= BPF_FIB_LOOKUP_SKIP_NEIGH
+	}
+	if in.TableID != nil {
+		if flags&BPF_FIB_LOOKUP_DIRECT == 0 {
+			cmd.PrintErrf("Forcefully setting BFP_FIB_LOOKUP_DIRECT option since you specified table option which requires direct lookup. To suppress this message, set --direct flag explicitly.\n")
+			flags |= BPF_FIB_LOOKUP_DIRECT
+		}
+		flags |= BPF_FIB_LOOKUP_TBID
+	}
+	if src, _ := cmd.Flags().GetBool("src"); src {
+		flags |= BPF_FIB_LOOKUP_SRC
+	}
+	if in.Mark != nil {
+		flags |= BPF_FIB_LOOKUP_MARK
+		if flags&BPF_FIB_LOOKUP_DIRECT != 0 {
+			cmd.PrintErrf("Forcefully resetting BPF_FIB_LOOKUP_DIRECT option since you specified mark option which should not be used with direct lookup. To suppress this message, don't set --direct flag.\n")
+			flags &^= BPF_FIB_LOOKUP_DIRECT
+		}
+	}
+	return flags
+}
+
 // lookupCmd represents the lookup command
 var lookupCmd = &cobra.Command{
 	Use:   "lookup [flags] dest iif [options]",
@@ -292,33 +323,8 @@ var lookupCmd = &cobra.Command{
 			return
 		}
 
-		// Additional flags for bpf_fib_lookup
-		flags := uint32(0)
-		if direct, _ := cmd.Flags().GetBool("direct"); direct {
-			flags |= BPF_FIB_LOOKUP_DIRECT
-		}
-		if output, _ := cmd.Flags().GetBool("output"); output {
-			flags |= BPF_FIB_LOOKUP_OUTPUT
-		}
-		if skipNeigh, _ := cmd.Flags().GetBool("skip-neigh"); skipNeigh {
-			flags |= BPF_FIB_LOOKUP_SKIP_NEIGH
-		}
-		if in.TableID != nil {
-			if flags&BPF_FIB_LOOKUP_DIRECT == 0 {
-				cmd.PrintErrf("Forcefully setting BFP_FIB_LOOKUP_DIRECT option since you specified table option which requires direct lookup. To suppress this message, set --direct flag explicitly.\n")
-				flags |= BPF_FIB_LOOKUP_DIRECT
-			}
-			flags |= BPF_FIB_LOOKUP_TBID
-		}
-		if src, _ := cmd.Flags().GetBool("src"); src {
-			flags |= BPF_FIB_LOOKUP_SRC
-		}
-		if in.Mark != nil {
-			if flags&BPF_FIB_LOOKUP_DIRECT != 0 {
-				cmd.PrintErrf("Forcefully resetting BPF_FIB_LOOKUP_DIRECT option since you specified mark option which should not be used with direct lookup. To suppress this message, don't set --direct flag.\n")
-				flags &^= BPF_FIB_LOOKUP_DIRECT
-			}
-		}
+		// Additional flags for bpf_fib_lookup.
+		flags := buildLookupFlags(cmd, in)
 
 		// Serialize input parameters to write struct bpf_fib_lookup to map
 		param := in.marshal()
