@@ -18,10 +18,12 @@ func parseSkbBuffMembers() error {
 		return fmt.Errorf("failed to load kernel BTF: %w", err)
 	}
 
-	iter := btfSpec.Iterate()
-	for iter.Next() {
+	for typ, err := range btfSpec.All() {
+		if err != nil {
+			return fmt.Errorf("iterate kernel BTF: %w", err)
+		}
 
-		if strct, ok := iter.Type.(*btf.Struct); ok && strct.Name == "__sk_buff" {
+		if strct, ok := typ.(*btf.Struct); ok && strct.Name == "__sk_buff" {
 			fields := make(map[string][2]uint32)
 
 			for _, member := range strct.Members {
