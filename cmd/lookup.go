@@ -46,8 +46,8 @@ type lookupIn struct {
 	DstAddr      netip.Addr
 	TableID      *uint32
 	Mark         *uint32
-	SkbLen       uint32
-	GsoSize      uint32
+	SkbLen       *uint32
+	GsoSize      *uint32
 }
 
 func (in *lookupIn) marshal() []byte {
@@ -252,6 +252,12 @@ var lookupCmd = &cobra.Command{
 	Long:  "Lookup FIB using bpf_fib_lookup helper function",
 	Run: func(cmd *cobra.Command, args []string) {
 		in := &lookupIn{}
+		mode, _ := cmd.Flags().GetString("mode")
+		if mode != "tc" && mode != "xdp" {
+			cmd.PrintErrf("Invalid mode: %s (expected tc or xdp)\n\n", mode)
+			cmd.Help()
+			return
+		}
 
 		if len(args) < 2 {
 			cmd.PrintErrf("Argument too short\n\n")
@@ -292,6 +298,33 @@ var lookupCmd = &cobra.Command{
 			return
 		}
 
+		if mode == "xdp" {
+			var unsupported []string
+			if in.SkbLen != nil {
+				unsupported = append(unsupported, "skblen")
+			}
+			if in.GsoSize != nil {
+				unsupported = append(unsupported, "gso_size")
+			}
+			if skipNeigh, _ := cmd.Flags().GetBool("skip-neigh"); skipNeigh {
+				unsupported = append(unsupported, "--skip-neigh")
+			}
+			if src, _ := cmd.Flags().GetBool("src"); src {
+				unsupported = append(unsupported, "--src")
+			}
+			if in.Mark != nil {
+				unsupported = append(unsupported, "mark")
+			}
+			if in.TableID != nil {
+				unsupported = append(unsupported, "table")
+			}
+			if len(unsupported) != 0 {
+				cmd.PrintErrf("Options not supported in XDP mode: %s\n\n", strings.Join(unsupported, ", "))
+				cmd.Help()
+				return
+			}
+		}
+
 		// Additional flags for bpf_fib_lookup
 		flags := uint32(0)
 		if direct, _ := cmd.Flags().GetBool("direct"); direct {
@@ -326,6 +359,10 @@ var lookupCmd = &cobra.Command{
 		paramSize := uint32(len(param))
 
 		// Create eBPF program and load it
+		programType := ebpf.SchedCLS
+		if mode == "xdp" {
+			programType = ebpf.XDP
+		}
 		colSpec := ebpf.CollectionSpec{
 			Maps: map[string]*ebpf.MapSpec{
 				"param": {
@@ -345,7 +382,7 @@ var lookupCmd = &cobra.Command{
 			Programs: map[string]*ebpf.ProgramSpec{
 				"lookup": {
 					Name:    "lookup",
-					Type:    ebpf.SchedCLS,
+					Type:    programType,
 					License: "GPL",
 					Instructions: asm.Instructions{
 						// Save context
@@ -383,24 +420,29 @@ var lookupCmd = &cobra.Command{
 		// We don't need to attach the program to any interface. Just
 		// run it should be sufficient to test the bpf_fib_lookup.
 		skbLen := 64
-		if in.SkbLen != 0 {
-			skbLen = int(in.SkbLen)
+		if in.SkbLen != nil && *in.SkbLen != 0 {
+			skbLen = int(*in.SkbLen)
 		}
-		context := make([]byte, 256)
-		if in.GsoSize != 0 {
-			offset, size, err := MemberOfSkBuff("gso_size")
-			if err != nil {
-				cmd.PrintErrf("Failed to get offset of gso_size: %s\n\n", err)
-				return
+		var context any
+		var contextOut any
+		if mode == "tc" {
+			context = make([]byte, 256)
+			contextOut = make([]byte, 256)
+			if in.GsoSize != nil && *in.GsoSize != 0 {
+				offset, size, err := MemberOfSkBuff("gso_size")
+				if err != nil {
+					cmd.PrintErrf("Failed to get offset of gso_size: %s\n\n", err)
+					return
+				}
+				binary.NativeEndian.PutUint32(context.([]byte)[offset:offset+size], *in.GsoSize)
 			}
-			binary.NativeEndian.PutUint32(context[offset:offset+size], in.GsoSize)
 		}
 		runOptions := &ebpf.RunOptions{
 			Data: bytes.Repeat([]byte{0xff}, skbLen),
 			// https://github.com/cilium/ebpf/blob/20c4d8896bdde990ce6b80d59a4262aa3ccb891d/prog.go#L563-L567
 			DataOut:    make([]byte, skbLen+256+2),
 			Context:    context,
-			ContextOut: make([]byte, 256),
+			ContextOut: contextOut,
 		}
 		uret, err := col.Programs["lookup"].Run(runOptions)
 		if err != nil {
@@ -614,7 +656,8 @@ var lookupCmdOpts = map[string]lookupOpt{
 			if err != nil {
 				return 0, fmt.Errorf("cannot parse skblen: %w", err)
 			}
-			in.SkbLen = uint32(skblen)
+			skblen32 := uint32(skblen)
+			in.SkbLen = &skblen32
 			return 1, nil
 		},
 	},
@@ -628,7 +671,8 @@ var lookupCmdOpts = map[string]lookupOpt{
 			if err != nil {
 				return 0, fmt.Errorf("cannot parse gso_size: %w", err)
 			}
-			in.GsoSize = uint32(gsoSize)
+			gsoSize32 := uint32(gsoSize)
+			in.GsoSize = &gsoSize32
 			return 1, nil
 		},
 	},
@@ -695,4 +739,5 @@ func init() {
 	lookupCmd.Flags().Bool("output", false, "Set output option (BPF_FIB_LOOKUP_OUTPUT)")
 	lookupCmd.Flags().Bool("skip-neigh", false, "Set skip-neigh option (BPF_FIB_LOOKUP_SKIP_NEIGH)")
 	lookupCmd.Flags().Bool("src", false, "Set src option (BPF_FIB_LOOKUP_SRC)")
+	lookupCmd.Flags().String("mode", "tc", "Choose execution mode (tc or xdp)")
 }
