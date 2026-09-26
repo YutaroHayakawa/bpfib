@@ -24,24 +24,25 @@ Usage: lookup [flags] dest iif [options]
 
 Options:
 
-	dport		<port>				Destination port
-	totlen		<length>			Total length of the IP packet
-	table		<table id>			Table ID
-	mark		<mark>				Mark
-	skblen		<skblen>			skb->len
 	sport		<port>				Source port
 	tos		<tos in hex>			ToS for IPv4
 	flowinfo	<flowinfo in hex>		Flow Label + Priority for IPv6
 	from		<address>			Source address
+	mark		<mark>				Mark
+	skblen		<skblen>			skb->len
 	gso_size	<gso_size>			skb_shinfo(skb)->gso_size
+	dport		<port>				Destination port
+	totlen		<length>			Total length of the IP packet
+	table		<table id>			Table ID
 	l4proto		<tcp|udp>			L4 protocol
 
 Flags:
-      --direct       Set direct option (BPF_FIB_LOOKUP_DIRECT)
-  -h, --help         help for lookup
-      --output       Set output option (BPF_FIB_LOOKUP_OUTPUT)
-      --skip-neigh   Set skip-neigh option (BPF_FIB_LOOKUP_SKIP_NEIGH)
-      --src          Set src option (BPF_FIB_LOOKUP_SRC)
+      --direct        Set direct option (BPF_FIB_LOOKUP_DIRECT)
+  -h, --help          help for lookup
+      --mode string   Choose execution mode (tc or xdp) (default "tc")
+      --output        Set output option (BPF_FIB_LOOKUP_OUTPUT)
+      --skip-neigh    Set skip-neigh option (BPF_FIB_LOOKUP_SKIP_NEIGH)
+      --src           Set src option (BPF_FIB_LOOKUP_SRC)
 ```
 
 #### Example
